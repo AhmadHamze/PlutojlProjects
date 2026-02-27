@@ -6,6 +6,7 @@ using InteractiveUtils
 
 # ╔═╡ 568c1ae0-1187-11f1-acab-0fc044ffc344
 begin
+	import ImageMagick
 	using Images, ImageIO, FileIO
 	using PlutoUI
 	using HypertextLiteral
@@ -18,19 +19,20 @@ md"""
 When running this notebook for the first time, it could take up to 15 minutes for the installation to complete.
 """
 
-# ╔═╡ c69cfcbb-a380-4037-a400-fc134845eafa
-dirty_cat = load("./images/dirty_cat.jpeg")
+# ╔═╡ a36ba750-5f81-4593-9c0f-d2d3649446f5
+# IMPORTANT: it is essential to use RGB{Float64}.() to load the image
+cat = RGB{Float64}.(load("./images/cat.png"))
 
 # ╔═╡ 1615e84c-f6c3-4524-bdc4-caa1b6d94cee
-function check_pixel_neighboor(pixel::AbstractRGB, neighboor::AbstractMatrix)
-  # checks the pixels on top and bottom, if the difference is big, then make it white
+function check_pixel_neighboor(neighboor::AbstractMatrix)
+  # checks the pixels on top and bottom, if the difference is big, then make it black
   # do the same when comparing right and left
-  threshold = 0.05
+  threshold = 0.2
   vertical_change = abs(neighboor[1, 2] - neighboor[3, 2])
   horizontal_change = abs(neighboor[2, 1] - neighboor[2, 3])
-  if vertical_change.r > threshold || vertical_change.g > threshold || vertical_change.b > threshold
+  if any((vertical_change.r, vertical_change.g, vertical_change.b) .> threshold)
     return RGB(1.0, 1.0, 1.0)
-  elseif horizontal_change.r > threshold || horizontal_change.g > threshold || horizontal_change.b > threshold
+  elseif any((horizontal_change.r, horizontal_change.g, horizontal_change.b) .> threshold)
 	  return RGB(1.0, 1.0, 1.0)
   else
 	  return RGB(0.0, 0.0, 0.0)
@@ -41,14 +43,125 @@ end
 function simple_edge_detection(image::AbstractMatrix)
 	s = size(image)
 	result_image = [
-		check_pixel_neighboor(image[i,j], image[i:i+2, j:j+2])
+		check_pixel_neighboor(image[i-1:i+1, j-1:j+1])
 		for 
-		i in 1:s[1] - 2, j in 1:s[2] - 2
+		i in 2:s[1] - 1, j in 2:s[2] - 1
 	]
 end
 
-# ╔═╡ a471ca6f-4f14-4f1e-acee-89e0602ccfe0
-simple_edge_detection(dirty_cat)
+# ╔═╡ 390c99ec-824c-4bfc-9a74-0d7cbbef2276
+simple_edge_detection(cat)
+
+# ╔═╡ c20e109e-63ad-45f4-88ad-852fd0c04e5d
+md"""
+# Convolution
+"""
+
+# ╔═╡ 75fc0d01-ab3b-4f09-96b8-c0ad585b5463
+md"""
+### The one dimensional case
+"""
+
+# ╔═╡ 24f1443a-ed82-47bc-afe6-e22f91fa3e40
+# The argument i is playing the role of the index, if the index is within range
+# the corresponding value is returned, otherwise, the closest value is returned
+function extend(v::AbstractVector, i)
+	n = size(v)[1]
+	if 1 <= i <= n
+		return v[i]
+	elseif i > n
+		return v[end]
+	else
+		return v[1]
+	end
+end
+
+# ╔═╡ 9f1b6822-192b-467a-8ee5-1dfe3aada9c8
+example_vector = [0.8, 0.2, 0.1, 0.7, 0.6, 0.4]
+
+# ╔═╡ 546121ce-b2c3-49f0-b064-7ed2a27ec1d5
+colored_line(x::Vector) = hcat(Gray.(Float64.(x)))'
+
+# ╔═╡ 4846d230-dd46-4d28-ae84-af7deed0b3c6
+colored_line(example_vector)
+
+# ╔═╡ 524a834a-7bd4-4d28-bfb3-7f41ad6bfc5c
+md"""
+### The two dimensional case
+"""
+
+# ╔═╡ 8a7ba271-2752-4814-9852-6bb6fc87eb90
+function extend(M::AbstractMatrix, i, j)
+	num_rows, num_cols = size(M)
+	# i is outside
+	if 1 > i || i > num_rows
+		if 1 <= j <= num_cols
+			return extend(M[:, j], i)
+		elseif 1 > j
+			return extend(M[:, 1], i)
+		else
+			return extend(M[:, end], i)
+		end
+	# j is outside
+	elseif 1 > j || j > num_cols
+		if 1 <= i <= num_rows
+			return extend(M[i, :], j)
+		elseif 1 > i
+			return extend(M[1, :], j)
+		else
+			return extend(M[end, :], j)
+		end
+	else
+		return M[i, j]
+	end
+end
+
+# ╔═╡ e9080e47-1d7d-4b29-aac8-46c206faae72
+colored_line([extend(example_vector, i) for i in -1:length(example_vector)+1])
+
+# ╔═╡ 156d256b-56fa-4a04-a473-4655d0d65340
+function convolve(v::AbstractVector, k::AbstractVector)
+	size_k = size(k)[1]
+	# Computing l such that the center of the kernel would the the center of the window of length 2*l + 1
+	l = (size_k - 1) ÷ 2
+	# Adjusting l in case size_k is even, this is to ensure having the correct window size
+	l_adjusted = size_k % 2 == 0 ? l + 1 : l
+	return [
+		# grabbing the values of the window then using broadcast mulitplication to multiply
+      # each element with the kernel k (k is inverted to follow the correct mathematical convention of convolution)
+		sum(
+			[extend(v, idx) for idx in i - l: i + l_adjusted] .* k[end:-1:1]
+		) # summing the result of each window
+		for i in 1:size(v)[1] # going from the beginning of the vector till the end
+	]
+end
+
+# ╔═╡ 38c24237-d3ee-4eac-81d9-6f1ebdc49502
+function convolve(M::AbstractMatrix, K::AbstractMatrix)
+	m_rows, m_cols = size(M)
+	ker_rows, ker_cols = size(K)
+	l_rows = (ker_rows - 1) ÷ 2
+	l_cols = (ker_cols - 1) ÷ 2
+	l_rows_adj = ker_rows % 2 == 0 ? l_rows + 1 : l_rows
+	l_cols_adj = ker_cols % 2 == 0 ? l_cols + 1 : l_cols
+	return [
+		sum([extend(M, i, j) for i in r - l_rows:r + l_rows_adj, j in c - l_cols:c + l_cols_adj] .* K[:, end:-1:1])
+		for r in 1:m_rows, c in 1:m_cols
+	]
+end
+
+# ╔═╡ df2669b2-1b64-4fe5-a087-5ead4c6ad1e9
+test_convolution = let
+	v = [1, 10, 100, 1000, 10000]
+	k = [1, 1, 0]
+	convolve(v, k)
+end
+
+# ╔═╡ 1c55f02c-0cb1-4e3c-839a-214c6233f675
+K_edge = [0 -1 0; -1 4 -1; 0 -1 0]
+
+# ╔═╡ fa16687e-f9f7-483d-8d03-0b76aa78e10e
+convolve(cat, K_edge)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -56,6 +169,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 HypertextLiteral = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
+ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 
@@ -63,6 +177,7 @@ PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 FileIO = "~1.17.1"
 HypertextLiteral = "~1.0.0"
 ImageIO = "~0.6.8"
+ImageMagick = "~1.4.2"
 Images = "~0.25.3"
 PlutoUI = "~0.7.79"
 """
@@ -73,7 +188,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.12.4"
 manifest_format = "2.0"
-project_hash = "87181abc6a63c7586ff74ef85f7885323d7f296d"
+project_hash = "ff0e2aa761e46fa52c53d588cba167fe2c2d9971"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1183,9 +1298,23 @@ version = "17.7.0+0"
 # ╔═╡ Cell order:
 # ╟─9d3d2820-feba-41af-aca7-af58c540859e
 # ╠═568c1ae0-1187-11f1-acab-0fc044ffc344
-# ╠═c69cfcbb-a380-4037-a400-fc134845eafa
+# ╠═a36ba750-5f81-4593-9c0f-d2d3649446f5
 # ╠═1615e84c-f6c3-4524-bdc4-caa1b6d94cee
 # ╠═78bd507f-07e2-473f-90f9-3163282b4fe0
-# ╠═a471ca6f-4f14-4f1e-acee-89e0602ccfe0
+# ╠═390c99ec-824c-4bfc-9a74-0d7cbbef2276
+# ╟─c20e109e-63ad-45f4-88ad-852fd0c04e5d
+# ╟─75fc0d01-ab3b-4f09-96b8-c0ad585b5463
+# ╠═24f1443a-ed82-47bc-afe6-e22f91fa3e40
+# ╠═9f1b6822-192b-467a-8ee5-1dfe3aada9c8
+# ╠═546121ce-b2c3-49f0-b064-7ed2a27ec1d5
+# ╠═4846d230-dd46-4d28-ae84-af7deed0b3c6
+# ╠═e9080e47-1d7d-4b29-aac8-46c206faae72
+# ╠═156d256b-56fa-4a04-a473-4655d0d65340
+# ╠═df2669b2-1b64-4fe5-a087-5ead4c6ad1e9
+# ╟─524a834a-7bd4-4d28-bfb3-7f41ad6bfc5c
+# ╠═8a7ba271-2752-4814-9852-6bb6fc87eb90
+# ╠═38c24237-d3ee-4eac-81d9-6f1ebdc49502
+# ╠═1c55f02c-0cb1-4e3c-839a-214c6233f675
+# ╠═fa16687e-f9f7-483d-8d03-0b76aa78e10e
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
