@@ -42,7 +42,7 @@ end
 # ╔═╡ 78bd507f-07e2-473f-90f9-3163282b4fe0
 function simple_edge_detection(image::AbstractMatrix)
 	s = size(image)
-	result_image = [
+	[
 		check_pixel_neighboor(image[i-1:i+1, j-1:j+1])
 		for 
 		i in 2:s[1] - 1, j in 2:s[2] - 1
@@ -93,25 +93,39 @@ md"""
 # ╔═╡ 8a7ba271-2752-4814-9852-6bb6fc87eb90
 function extend(M::AbstractMatrix, i, j)
 	num_rows, num_cols = size(M)
-	# i is outside
+	# i is outside (too little or too big)
 	if 1 > i || i > num_rows
+		# j is inside the valid range
 		if 1 <= j <= num_cols
+			# call the 1d extend on the j-th column of M and i
 			return extend(M[:, j], i)
+		# j is too little
 		elseif 1 > j
+			# call the 1d extend on the 1st column of M and i 
 			return extend(M[:, 1], i)
+		# j is too big (the remaining case)
 		else
+			# call the 1d extend on the last column of M and i
 			return extend(M[:, end], i)
 		end
-	# j is outside
+	# j is outside (too little or too big)
 	elseif 1 > j || j > num_cols
+		# i is inside the valid range
 		if 1 <= i <= num_rows
+			# call the 1d extend on the i-th row of M and j
 			return extend(M[i, :], j)
+		# i is too little
 		elseif 1 > i
+			# call the 1d extend on the 1st row of M and j
 			return extend(M[1, :], j)
+		# i is too big (the remaining case)
 		else
+			# call the 1d extend on the last row of M and j
 			return extend(M[end, :], j)
 		end
+	# The case where everything is good
 	else
+		# return the value at (i,j)
 		return M[i, j]
 	end
 end
@@ -122,7 +136,7 @@ colored_line([extend(example_vector, i) for i in -1:length(example_vector)+1])
 # ╔═╡ 156d256b-56fa-4a04-a473-4655d0d65340
 function convolve(v::AbstractVector, k::AbstractVector)
 	size_k = size(k)[1]
-	# Computing l such that the center of the kernel would the the center of the window of length 2*l + 1
+	# Computing l such that the center of the kernel would be the center of the window of length 2*l + 1
 	l = (size_k - 1) ÷ 2
 	# Adjusting l in case size_k is even, this is to ensure having the correct window size
 	l_adjusted = size_k % 2 == 0 ? l + 1 : l
@@ -140,13 +154,23 @@ end
 function convolve(M::AbstractMatrix, K::AbstractMatrix)
 	m_rows, m_cols = size(M)
 	ker_rows, ker_cols = size(K)
+	# l_rows is such that the horizontal center of the kernel would be the horizontal center of the matrix of length 2*l_rows + 1
 	l_rows = (ker_rows - 1) ÷ 2
+	# l_cols is such that the vertical center of the kernel would be the vertical center of the matrix of length 2*l_cols + 1
 	l_cols = (ker_cols - 1) ÷ 2
+	# Adjusting like the 1D case to ensure having the correct window sizes
 	l_rows_adj = ker_rows % 2 == 0 ? l_rows + 1 : l_rows
 	l_cols_adj = ker_cols % 2 == 0 ? l_cols + 1 : l_cols
 	return [
-		sum([extend(M, i, j) for i in r - l_rows:r + l_rows_adj, j in c - l_cols:c + l_cols_adj] .* K[:, end:-1:1])
-		for r in 1:m_rows, c in 1:m_cols
+		sum(
+			# The logic is similar to the 1D case, but two dimensional
+			[
+				extend(M, i, j) for i in r - l_rows:r + l_rows_adj, j in c - l_cols:c + l_cols_adj
+			]
+			.* 
+			K[:, end:-1:1] # inverting k to follow the correct mathematical convention
+		)
+		for r in 1:m_rows, c in 1:m_cols # creating a new matrix convolution matrix from the initial matrix and kernel
 	]
 end
 
@@ -162,6 +186,36 @@ K_edge = [0 -1 0; -1 4 -1; 0 -1 0]
 
 # ╔═╡ fa16687e-f9f7-483d-8d03-0b76aa78e10e
 convolve(cat, K_edge)
+
+# ╔═╡ a412a62e-6e0c-48c7-ba7e-724befabfb29
+K_sharpen = [0 -1 0; -1 5 -1; 0 -1 0]
+
+# ╔═╡ b25026dc-3e8b-418a-b973-617bb81f681c
+convolve(cat, K_sharpen)
+
+# ╔═╡ 204579dd-c86b-4f41-924d-642f2821b01b
+K_gaussian_blur = 1 / 16 .* [1 2 1; 2 4 2; 1 2 1]
+
+# ╔═╡ d9fee637-a199-4503-a2e3-9a9af70ee59b
+convolve(cat, K_gaussian_blur)
+
+# ╔═╡ 0f2cccbc-2f6e-4336-8c51-51d57edb6aab
+K_random = [1 -1 2; 3 4 -1; 0 -2 -3]
+
+# ╔═╡ 5ea121d2-7151-4b41-b983-78db77c96af5
+convolve(cat, K_random)
+
+# ╔═╡ 8ae73ecf-0973-4091-adeb-33f3aa1e2993
+begin
+	K_blur_5 = 1 / 256 .* [
+		1 4 6 4 1;
+		4 16 24 16 4;
+		6 24 36 24 6;
+		4 16 24 16 4;
+		1 4 6 4 1;
+	]
+	convolve(cat, K_blur_5)
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1316,5 +1370,12 @@ version = "17.7.0+0"
 # ╠═38c24237-d3ee-4eac-81d9-6f1ebdc49502
 # ╠═1c55f02c-0cb1-4e3c-839a-214c6233f675
 # ╠═fa16687e-f9f7-483d-8d03-0b76aa78e10e
+# ╠═a412a62e-6e0c-48c7-ba7e-724befabfb29
+# ╠═b25026dc-3e8b-418a-b973-617bb81f681c
+# ╠═204579dd-c86b-4f41-924d-642f2821b01b
+# ╠═d9fee637-a199-4503-a2e3-9a9af70ee59b
+# ╠═0f2cccbc-2f6e-4336-8c51-51d57edb6aab
+# ╠═5ea121d2-7151-4b41-b983-78db77c96af5
+# ╠═8ae73ecf-0973-4091-adeb-33f3aa1e2993
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
