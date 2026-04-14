@@ -4,6 +4,18 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    #! format: off
+    return quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+    #! format: on
+end
+
 # ╔═╡ 568c1ae0-1187-11f1-acab-0fc044ffc344
 begin
 	import ImageMagick
@@ -14,14 +26,22 @@ end
 
 # ╔═╡ 9d3d2820-feba-41af-aca7-af58c540859e
 md"""
-# Initializing packages
+### Initializing packages
 
 When running this notebook for the first time, it could take up to 15 minutes for the installation to complete.
 """
 
+# ╔═╡ 67e8ef05-5ea3-49b2-8458-3b8a901697c6
+md"""
+# Image manipulation
+
+The first section of this notebook deals with real images, uncomment the marked cells and run them if you want to see the effect of convolution on images
+"""
+
 # ╔═╡ a36ba750-5f81-4593-9c0f-d2d3649446f5
+# UNCOMMENT: load the cat image
 # IMPORTANT: it is essential to use RGB{Float64}.() to load the image
-cat = RGB{Float64}.(load("./images/cat.png"))
+# cat = RGB{Float64}.(load("./images/cat.png"))
 
 # ╔═╡ 1615e84c-f6c3-4524-bdc4-caa1b6d94cee
 function check_pixel_neighboor(neighboor::AbstractMatrix)
@@ -50,11 +70,14 @@ function simple_edge_detection(image::AbstractMatrix)
 end
 
 # ╔═╡ 390c99ec-824c-4bfc-9a74-0d7cbbef2276
-simple_edge_detection(cat)
+# UNCOMMENT: see the effects of the simple edge detection on the cat image
+# simple_edge_detection(cat)
 
 # ╔═╡ c20e109e-63ad-45f4-88ad-852fd0c04e5d
 md"""
 # Convolution
+
+In this part you can find the code for convolution.
 """
 
 # ╔═╡ 75fc0d01-ab3b-4f09-96b8-c0ad585b5463
@@ -181,41 +204,150 @@ test_convolution = let
 	convolve(v, k)
 end
 
+# ╔═╡ 36309204-b0c5-4963-ab6a-5b60d74ca3c4
+md"""
+### Kernels
+
+This section applies the convolution function on the cat image with different kernels.
+
+Uncomment the cells and run them to see the effect
+"""
+
 # ╔═╡ 1c55f02c-0cb1-4e3c-839a-214c6233f675
-K_edge = [0 -1 0; -1 4 -1; 0 -1 0]
+# K_edge = [0 -1 0; -1 4 -1; 0 -1 0]
 
 # ╔═╡ fa16687e-f9f7-483d-8d03-0b76aa78e10e
-convolve(cat, K_edge)
+# convolve(cat, K_edge)
 
 # ╔═╡ a412a62e-6e0c-48c7-ba7e-724befabfb29
-K_sharpen = [0 -1 0; -1 5 -1; 0 -1 0]
+# K_sharpen = [0 -1 0; -1 5 -1; 0 -1 0]
 
 # ╔═╡ b25026dc-3e8b-418a-b973-617bb81f681c
-convolve(cat, K_sharpen)
+# convolve(cat, K_sharpen)
 
 # ╔═╡ 204579dd-c86b-4f41-924d-642f2821b01b
-K_gaussian_blur = 1 / 16 .* [1 2 1; 2 4 2; 1 2 1]
+# K_gaussian_blur = 1 / 16 .* [1 2 1; 2 4 2; 1 2 1]
 
 # ╔═╡ d9fee637-a199-4503-a2e3-9a9af70ee59b
-convolve(cat, K_gaussian_blur)
+# convolve(cat, K_gaussian_blur)
 
 # ╔═╡ 0f2cccbc-2f6e-4336-8c51-51d57edb6aab
-K_random = [1 -1 2; 3 4 -1; 0 -2 -3]
+# K_random = [1 -1 2; 3 4 -1; 0 -2 -3]
 
 # ╔═╡ 5ea121d2-7151-4b41-b983-78db77c96af5
-convolve(cat, K_random)
+# convolve(cat, K_random)
 
 # ╔═╡ 8ae73ecf-0973-4091-adeb-33f3aa1e2993
+# begin
+# 	K_blur_5 = 1 / 256 .* [
+# 		1 4 6 4 1;
+# 		4 16 24 16 4;
+# 		6 24 36 24 6;
+# 		4 16 24 16 4;
+# 		1 4 6 4 1;
+# 	]
+# 	convolve(cat, K_blur_5)
+# end
+
+# ╔═╡ 0b7eafc2-ea0b-478d-b33c-dcd5aa674a0a
+md"""
+---
+"""
+
+# ╔═╡ 28e96d10-779b-4c32-9331-faf9d0487e14
+md"""
+# Cellular Automata
+
+In this section, cellular automata is built using convolution.
+
+This section is flaking, before you run anything, keep this in mind:
+
+1. You might get errors the first time you run the convolution cells, trying again will be needed
+2. You have to re-run the cells that contain `Clock()` every time you want to restart the CA
+3. Only have one running CA at a time, running mutliple CA will result in errors or a crash
+4. If you want to change the starting grid, you have to restart the entire notebook, i.e. turn off Pluto and the Julia session, then start them again. Failing to do so will result is strange behaviors that breaks the CA
+"""
+
+# ╔═╡ ff3a8a3b-8f73-4389-a4e3-6648d5f50675
+parity_kernel = [0 1 0; 1 0 1; 0 1 0]
+
+# ╔═╡ 5fc0c9ae-eed0-497c-a724-627a7983293d
+# !IMPORTANT: you have to re-run this cell when you want to start again
+# Stopping the clock and clicking start again might cause issues
 begin
-	K_blur_5 = 1 / 256 .* [
-		1 4 6 4 1;
-		4 16 24 16 4;
-		6 24 36 24 6;
-		4 16 24 16 4;
-		1 4 6 4 1;
-	]
-	convolve(cat, K_blur_5)
+	memo = Dict()
+	m = falses(200, 200)
+	m[100, 100] = 1
+	@bind step Clock()
 end
+
+# ╔═╡ d6671867-1b84-4893-93f2-3c857436cc02
+function grid!(;n, grid, kernel, logic, memo=memo)
+	if haskey(memo, n)
+		return memo[n]
+	end
+	if n == 1
+		memo[n] = grid
+		return grid
+	end
+	memo[n] = logic(convolve(grid!(n=n - 1, grid=grid, kernel=kernel, logic=logic), kernel), memo[n - 1]) # use the previous grid if needed
+	delete!(memo, n - 1)
+	return memo[n]
+end
+
+# ╔═╡ 5bec18c7-7f05-41d4-9e0f-0d8a09be64ec
+print(step)
+
+# ╔═╡ 4b23457e-9169-4c98-978e-e26840b1882d
+# Gray.(.!grid!(n=step, grid=m, kernel=parity_kernel, logic=((M, _) -> isodd.(M))))
+
+# ╔═╡ 76bd7f3d-2f5f-442b-b002-cd89bdfbc99b
+md"""
+## Conway's Game of Life
+"""
+
+# ╔═╡ d489111c-0eac-45b7-bac6-78ea3c81269a
+conway_kernel = [1 1 1; 1 0 1; 1 1 1]
+
+# ╔═╡ b2c2a996-a53a-45e4-b99c-9dab75b620b3
+function conway_rule(pair)
+    cell, n = pair
+
+    if cell == 1  # alive
+        return (n == 2 || n == 3)
+    else          # dead
+        return n == 3
+    end
+end
+
+# ╔═╡ 9161531a-b20b-4f25-b65a-3f6e52f9ff2b
+function apply_conway(convolution_matrix::AbstractMatrix, grid::AbstractMatrix)
+	# Construct a (live/dead, nbr of dead cells)
+	pairing_matrix = zip(grid, convolution_matrix)
+	return conway_rule.(pairing_matrix)
+end
+
+# ╔═╡ 24828a76-191f-481f-a83c-9090d8a45ccb
+begin
+	# A random matrix with 90% white cells and 10% black cells
+	r = rand(200, 200) .< 0.1
+	
+	# building a glider around r[200, 200]
+	# r = falses(400, 400)
+	# r[199, 200] = true
+	# r[200, 201] = true
+	# r[201, 199] = true
+	# r[201, 200] = true
+	# r[201, 201] = true
+	conway_memo = Dict()
+	@bind conway_step Clock()
+end
+
+# ╔═╡ 2b1ff9a4-8c0e-4779-86a0-bad5df3d295b
+print(conway_step)
+
+# ╔═╡ 5b34ca25-ede3-4f6e-b3f2-1adb58bcb11d
+Gray.(.!grid!(n=conway_step, grid=r, kernel=conway_kernel, logic=apply_conway, memo=conway_memo))
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1352,6 +1484,7 @@ version = "17.7.0+0"
 # ╔═╡ Cell order:
 # ╟─9d3d2820-feba-41af-aca7-af58c540859e
 # ╠═568c1ae0-1187-11f1-acab-0fc044ffc344
+# ╟─67e8ef05-5ea3-49b2-8458-3b8a901697c6
 # ╠═a36ba750-5f81-4593-9c0f-d2d3649446f5
 # ╠═1615e84c-f6c3-4524-bdc4-caa1b6d94cee
 # ╠═78bd507f-07e2-473f-90f9-3163282b4fe0
@@ -1368,6 +1501,7 @@ version = "17.7.0+0"
 # ╟─524a834a-7bd4-4d28-bfb3-7f41ad6bfc5c
 # ╠═8a7ba271-2752-4814-9852-6bb6fc87eb90
 # ╠═38c24237-d3ee-4eac-81d9-6f1ebdc49502
+# ╟─36309204-b0c5-4963-ab6a-5b60d74ca3c4
 # ╠═1c55f02c-0cb1-4e3c-839a-214c6233f675
 # ╠═fa16687e-f9f7-483d-8d03-0b76aa78e10e
 # ╠═a412a62e-6e0c-48c7-ba7e-724befabfb29
@@ -1377,5 +1511,19 @@ version = "17.7.0+0"
 # ╠═0f2cccbc-2f6e-4336-8c51-51d57edb6aab
 # ╠═5ea121d2-7151-4b41-b983-78db77c96af5
 # ╠═8ae73ecf-0973-4091-adeb-33f3aa1e2993
+# ╟─0b7eafc2-ea0b-478d-b33c-dcd5aa674a0a
+# ╟─28e96d10-779b-4c32-9331-faf9d0487e14
+# ╠═ff3a8a3b-8f73-4389-a4e3-6648d5f50675
+# ╠═d6671867-1b84-4893-93f2-3c857436cc02
+# ╠═5fc0c9ae-eed0-497c-a724-627a7983293d
+# ╠═5bec18c7-7f05-41d4-9e0f-0d8a09be64ec
+# ╠═4b23457e-9169-4c98-978e-e26840b1882d
+# ╟─76bd7f3d-2f5f-442b-b002-cd89bdfbc99b
+# ╠═d489111c-0eac-45b7-bac6-78ea3c81269a
+# ╠═b2c2a996-a53a-45e4-b99c-9dab75b620b3
+# ╠═9161531a-b20b-4f25-b65a-3f6e52f9ff2b
+# ╠═24828a76-191f-481f-a83c-9090d8a45ccb
+# ╠═2b1ff9a4-8c0e-4779-86a0-bad5df3d295b
+# ╠═5b34ca25-ede3-4f6e-b3f2-1adb58bcb11d
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
